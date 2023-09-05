@@ -1,4 +1,6 @@
-use metal_rs::MTLPixelFormat;
+use std::fs::File;
+
+use metal_rs::{MTLPixelFormat, CompileOptions};
 
 fn main() {
     // Create a window
@@ -13,6 +15,11 @@ fn main() {
     // Create device
     let device = Device::system_default().expect("Could not create device.");
 
+    // Load shader source
+    let mut shader_source_file = File::open("metal/shaders/hello_triangle.metal").expect("Failed to open shader file.");
+    let mut source = String::new();
+    file.read_to_string(&mut source).expect("Failed to read file.");
+
     // Create metal layer
     let layer = MetalLayer::new();
     layer.set_device(&device);
@@ -25,4 +32,6 @@ fn main() {
         view.setWantsLayer(YES);
         view.setLayer(mem::transmute(layer.as_ref()));
     }
+
+
 }
