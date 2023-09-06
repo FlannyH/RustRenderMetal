@@ -11,6 +11,13 @@ pub struct Vertex {
     pub uv1: Vec2,
 }
 
+#[repr(C)]
+pub struct ConstBuffer {
+    pub model_matrix: Mat4,
+    pub view_matrix: Mat4,
+    pub proj_matrix: Mat4,
+}
+
 #[derive(Debug, Copy, Clone)]
 pub struct FragIn {
     pub position: Vec4,

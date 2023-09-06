@@ -3,21 +3,22 @@ use std::mem;
 use cocoa::appkit::NSView;
 use cocoa::base::YES;
 use core_graphics_types::geometry::CGSize;
-use metal::{Device, MetalLayer, MTLPixelFormat, RenderPipelineState, RenderPipelineDescriptor, CommandQueue, Library, MTLResourceOptions, RenderPassDescriptor, MTLClearColor, MTLStoreAction, MTLScissorRect, MTLPrimitiveType, MTLViewport};
+use metal::{Device, MetalLayer, MTLPixelFormat, RenderPipelineState, RenderPipelineDescriptor, CommandQueue, Library, MTLResourceOptions, RenderPassDescriptor, MTLClearColor, MTLStoreAction, MTLScissorRect, MTLPrimitiveType, MTLViewport, Buffer};
 use metal::foreign_types::ForeignType;
 use winit::platform::macos::WindowExtMacOS;
 use metal::MTLLoadAction;
 use winit::window::Window;
 
 use crate::mesh::Mesh;
-use crate::structs::Vertex;
+use crate::structs::{Vertex, ConstBuffer};
 
 pub struct Renderer{
     pub device: Option<Device>,
     pipeline_state: Option<RenderPipelineState>,
     library: Option<Library>,
     command_queue: Option<CommandQueue>,
-    layer: Option<MetalLayer>
+    layer: Option<MetalLayer>,
+    const_buffer: Option<Buffer>,
 }
 
 impl Renderer {
@@ -29,6 +30,7 @@ impl Renderer {
             command_queue: None,
             library: None,
             layer: None,
+            const_buffer: None,
         };
 
         // Create device
@@ -83,10 +85,18 @@ impl Renderer {
 
     pub fn upload_vertex_buffer(&mut self, mesh: &mut Mesh) {
         // Create the vertex buffer on the device
-        println!("{} vertices uploaded", mesh.verts.len());
         mesh.buffer = Some(self.device.as_ref().unwrap().new_buffer_with_data(
             mesh.verts.as_ptr() as *const _,
             (mesh.verts.len() * mem::size_of::<Vertex>()) as u64,
+            MTLResourceOptions::CPUCacheModeDefaultCache | MTLResourceOptions::StorageModeManaged,
+        ));
+    }
+
+    pub fn upload_const_buffer(&mut self, const_buffer: &mut ConstBuffer) {
+        // Create the constant buffer on the device
+        self.const_buffer = Some(self.device.as_ref().unwrap().new_buffer_with_data(
+            const_buffer as *mut _ as *const std::ffi::c_void,
+            mem::size_of::<ConstBuffer>() as u64,
             MTLResourceOptions::CPUCacheModeDefaultCache | MTLResourceOptions::StorageModeManaged,
         ));
     }
@@ -124,6 +134,7 @@ impl Renderer {
             zfar: 1.0,
         });
         command_encoder.set_vertex_buffer(0, Some(mesh.buffer.as_ref().unwrap()), 0);
+        command_encoder.set_vertex_buffer(1, Some(self.const_buffer.as_ref().unwrap()), 0);
         command_encoder.draw_primitives(MTLPrimitiveType::Triangle, 0, mesh.verts.len() as u64);
         command_encoder.end_encoding();
 

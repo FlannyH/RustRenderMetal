@@ -1,13 +1,13 @@
 #![allow(dead_code)]
 #![allow(clippy::needless_return)]
 
-use std::{path::Path, hash::Hash};
+use std::{path::Path, hash::Hash, f32::consts::PI};
 
-use glam::{Vec2, Vec3, Vec4};
+use glam::{Vec2, Vec3, Vec4, Mat4};
 use graphics::Renderer;
 use mesh::{Mesh, Model};
 use metal::objc::rc::autoreleasepool;
-use structs::Vertex;
+use structs::{Vertex, ConstBuffer};
 use winit::{event::{Event, WindowEvent}, event_loop::ControlFlow};
 
 mod material;
@@ -65,7 +65,7 @@ fn main() {
         ],
         buffer: None,
     };
-    let mut model_suzanne = Model::load_gltf(Path::new("./assets/suzanne.gltf")).expect("Could not find suzanne.gltf");
+    let model_suzanne = Model::load_gltf(Path::new("./assets/suzanne.gltf")).expect("Could not find suzanne.gltf");
     let mut mesh_suzanne = Mesh{ verts: Vec::new(), buffer: None };
 
     for (_key, value) in model_suzanne.meshes {
@@ -73,6 +73,19 @@ fn main() {
     }
 
     renderer.upload_vertex_buffer(&mut mesh_suzanne);
+
+    // Create const buffer
+    let mut const_buffer = ConstBuffer{
+        model_matrix: Mat4::IDENTITY,
+        view_matrix: Mat4 {
+            x_axis: Vec4{x: 0.5, y: 0.0, z: 0.0, w: 0.0},
+            y_axis: Vec4{x: 0.0, y: 1.0, z: 0.0, w: 0.0},
+            z_axis: Vec4{x: 0.0, y: 0.0, z: 1.0, w: 0.0},
+            w_axis: Vec4{x: 0.0, y: 0.0, z: 0.0, w: 1.0},
+        },
+        proj_matrix: Mat4::perspective_rh(PI / 4.0, 16.0/9.0, 0.1, 1000.0).transpose(),
+    };
+    renderer.upload_const_buffer(&mut const_buffer);
 
     // Main loop
     event_loop.run(move |event, _, control_flow| {
