@@ -119,7 +119,7 @@ fn main() {
                     let color_attachment = render_pass_descriptor.color_attachments().object_at(0).unwrap();
                     color_attachment.set_texture(Some(drawable.texture()));
                     color_attachment.set_load_action(MTLLoadAction::Clear);
-                    color_attachment.set_clear_color(MTLClearColor::new(1.0, 0.2, 0.25, 1.0));
+                    color_attachment.set_clear_color(MTLClearColor::new(0.1, 0.1, 0.2, 1.0));
                     color_attachment.set_store_action(MTLStoreAction::Store);
                     
                     // Set up command buffer
