@@ -34,7 +34,7 @@ vertex vertex_shader_output_t hello_triangle_vertex(
     vertex_shader_output_t out;
     const device vertex_t& vtx = vertex_array[vertex_index];
     out.color = float4(vtx.normal.r, vtx.normal.g, vtx.normal.b, 1.0);
-    out.position = float4(vtx.position.x+1.0, vtx.position.y, vtx.position.z - 7.0, 1.0);
+    out.position = float4(vtx.position.x, vtx.position.y, vtx.position.z - 7.0, 1.0);
     out.position *= const_buffer->proj_matrix;
     return out;
 }
