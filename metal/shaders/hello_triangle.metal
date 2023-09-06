@@ -73,21 +73,3 @@ float2 rect_vert(
     }
     return pos;
 }
-
-vertex VertexShaderOutput clear_rect_vertex(
-    const device ClearRect *clear_rect [[ buffer(0) ]],
-    unsigned int vid [[ vertex_id ]]
-) {
-    VertexShaderOutput out;
-    float4 pos = float4(rect_vert(clear_rect->rect, vid), 0, 1);
-    auto col = clear_rect->color;
-
-    out.position = pos;
-    out.color = float4(col.r, col.g, col.b, col.a);
-    return out;
-}
-
-fragment float4 clear_rect_fragment(VertexShaderOutput in [[stage_in]])
-{
-    return in.color;
-};

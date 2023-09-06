@@ -79,7 +79,6 @@ fn main() {
 
     // Initialize the pipeline states with functions from this library
     let hello_triangle_pipeline_state = prepare_pipeline_state(&device, &library, "hello_triangle_vertex", "hello_triangle_fragment");
-    let clear_rect_pipeline_state = prepare_pipeline_state(&device, &library, "clear_rect_vertex", "clear_rect_fragment");
 
     // Create command queue
     let command_queue = device.new_command_queue();
@@ -98,24 +97,11 @@ fn main() {
         MTLResourceOptions::CPUCacheModeDefaultCache | MTLResourceOptions::StorageModeManaged,
     );
 
-    // Create a full screen rectangle to use for clearing the screen
-    let clear_rect = vec![ClearRect {
-        rect: Vec4 {x: -1.0, y: -1.0, z: 2.0, w: 2.0},
-        color: Vec4 {x: 0.5, y: 0.8, z: 0.5, w: 1.0},
-    }];
-
-    let clear_rect_buffer = device.new_buffer_with_data(
-        clear_rect.as_ptr() as *const _,
-        mem::size_of::<ClearRect>() as u64,
-        MTLResourceOptions::CPUCacheModeDefaultCache | MTLResourceOptions::StorageModeManaged,
-    );
-
     // Main loop
     event_loop.run(move |event, _, control_flow| {
         autoreleasepool(|| {
             *control_flow = ControlFlow::Poll;
 
-            println!("{:?}", event);
             match event {
                 Event::WindowEvent{event, ..} => match event {
                     WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
