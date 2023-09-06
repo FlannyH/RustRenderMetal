@@ -6,5 +6,8 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-metal-rs = "0.10.6"
+cocoa = "0.25.0"
+core-graphics-types = "0.1.2"
+glam = "0.24.1"
+metal = "0.26.0"
 winit = "0.28.6"
