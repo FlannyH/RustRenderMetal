@@ -91,7 +91,6 @@ fn main() {
         (vertex_buffer_data.len() * mem::size_of::<HelloTriangleVertex>()) as u64,
         MTLResourceOptions::CPUCacheModeDefaultCache | MTLResourceOptions::StorageModeManaged,
     );
-    println!("buffer is {} bytes long", vertex_buffer.length());
 
     // Main loop
     event_loop.run(move |event, _, control_flow| {
@@ -113,6 +112,7 @@ fn main() {
                         Some(drawable) => drawable,
                         None => return,
                     };
+                    let size = layer.drawable_size();
 
                     // Set up framebuffer
                     let render_pass_descriptor = RenderPassDescriptor::new();
@@ -127,18 +127,8 @@ fn main() {
                     let command_encoder = command_buffer.new_render_command_encoder(&render_pass_descriptor);
 
                     // Record triangle draw call
-
-                    println!("{}", vertex_buffer_data.len());
-                    println!("{}", vertex_buffer.length());
-                    println!("{}", vertex_buffer.allocated_size());
-                    unsafe {
-                        //&*(vertex_buffer.contents() as *const HelloTriangleVertex)
-                        println!("{:?}", &*(vertex_buffer.contents() as *const HelloTriangleVertex));
-                        println!("{:?}", *((vertex_buffer.contents() as *mut HelloTriangleVertex).wrapping_add(1)));
-                        println!("{:?}", *((vertex_buffer.contents() as *mut HelloTriangleVertex).wrapping_add(2)));
-                    }
                     command_encoder.set_render_pipeline_state(&hello_triangle_pipeline_state);
-                    command_encoder.set_scissor_rect(MTLScissorRect{x: 0, y: 0, width: drawable_size.width as u64, height: drawable_size.height as u64});
+                    command_encoder.set_scissor_rect(MTLScissorRect{x: 0, y: 0, width: size.width as u64, height: size.height as u64});
                     command_encoder.set_vertex_buffer(0, Some(&vertex_buffer), 0);
                     command_encoder.draw_primitives(MTLPrimitiveType::Triangle, 0, vertex_buffer_data.len() as u64);
                     command_encoder.end_encoding();
