@@ -3,7 +3,7 @@
 
 use glam::{Vec2, Vec3, Vec4};
 use graphics::Renderer;
-use mesh::{Mesh, MeshTiny};
+use mesh::Mesh;
 use metal::objc::rc::autoreleasepool;
 use structs::Vertex;
 use winit::{event::{Event, WindowEvent}, event_loop::ControlFlow};
@@ -14,13 +14,6 @@ mod texture;
 mod structs;
 mod helpers;
 mod graphics;
-
-#[repr(C)]
-#[derive(Debug)]
-pub struct HelloTriangleVertex {
-    position: Vec2,
-    color: Vec3,
-}
 
 // Credits to https://github.com/gfx-rs/metal-rs/blob/master/examples/window/main.rs for the base structure
 fn main() {
@@ -41,8 +34,8 @@ fn main() {
 
 
     // Set up vertex buffer data for the triangle
-    let mut mesh_triangle = MeshTiny {
-        /*
+    let mut mesh_triangle = Mesh {
+
         verts: vec![
             Vertex{ 
                 position: Vec3{x: -0.5, y: -0.5, z: 0.0}, 
@@ -67,21 +60,6 @@ fn main() {
                 tangent: Vec4{x: 0.0, y: 0.0, z: 0.0, w: 1.0},
                 uv0: Vec2{x: 0.0, y: 0.0},
                 uv1: Vec2{x: 0.0, y: 0.0},
-            },
-        ],
-        */
-        verts: vec![
-            HelloTriangleVertex{ 
-                position: Vec2{x: -0.5, y: -0.5}, 
-                color: Vec3{x: 1.0, y: 0.0, z: 0.0},
-            },
-            HelloTriangleVertex{ 
-                position: Vec2{x: 0.5, y: -0.5}, 
-                color: Vec3{x: 0.0, y: 1.0, z: 0.0},
-            },
-            HelloTriangleVertex{ 
-                position: Vec2{x: 0.0, y: 0.5}, 
-                color: Vec3{x: 0.0, y: 0.0, z: 1.0},
             },
         ],
         buffer: None,

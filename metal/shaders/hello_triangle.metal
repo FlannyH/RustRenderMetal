@@ -4,12 +4,12 @@ using namespace metal;
 
 // Vertex layout
 struct vertex_t {
-    packed_float2 position;
-    //packed_float3 normal;
-    //packed_float4 tangent;
-    packed_float3 color;
-    //packed_float2 uv0;
-    //packed_float2 uv1;
+    float3 position;
+    float3 normal;
+    float4 tangent;
+    float4 color;
+    float2 uv0;
+    float2 uv1; 
 };
 
 // Data that's passed from the vertex shader to the fragment shader

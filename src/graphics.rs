@@ -9,8 +9,7 @@ use winit::platform::macos::WindowExtMacOS;
 use metal::MTLLoadAction;
 use winit::window::Window;
 
-use crate::HelloTriangleVertex;
-use crate::mesh::{Mesh, MeshTiny};
+use crate::mesh::Mesh;
 use crate::structs::Vertex;
 
 pub struct Renderer{
@@ -82,18 +81,18 @@ impl Renderer {
         self.pipeline_state = Some(self.device.as_ref().unwrap().new_render_pipeline_state(&pipeline_state_desc).unwrap());
     }
 
-    pub fn upload_vertex_buffer(&mut self, mesh: &mut MeshTiny) {
+    pub fn upload_vertex_buffer(&mut self, mesh: &mut Mesh) {
         // Create the vertex buffer on the device
         println!("{} vertices uploaded", mesh.verts.len());
         mesh.buffer = Some(self.device.as_ref().unwrap().new_buffer_with_data(
             mesh.verts.as_ptr() as *const _,
-            (mesh.verts.len() * mem::size_of::<HelloTriangleVertex>()) as u64,
+            (mesh.verts.len() * mem::size_of::<Vertex>()) as u64,
             MTLResourceOptions::CPUCacheModeDefaultCache | MTLResourceOptions::StorageModeManaged,
         ));
     }
 
     // mesh will be removed as parameter, it's here temporarily to have something working
-    pub fn render_frame(&self, mesh: &MeshTiny) {
+    pub fn render_frame(&self, mesh: &Mesh) {
         // Get the next framebuffer
         let drawable = match self.layer.as_ref().unwrap().next_drawable() {
             Some(drawable) => drawable,

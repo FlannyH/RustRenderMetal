@@ -1,4 +1,3 @@
-use crate::HelloTriangleVertex;
 use crate::material::Material;
 use crate::structs::Transform;
 use crate::structs::Vertex;
@@ -10,10 +9,6 @@ use std::{collections::HashMap, path::Path};
 
 pub struct Mesh {
     pub verts: Vec<Vertex>,
-    pub buffer: Option<Buffer>,
-}
-pub struct MeshTiny {
-    pub verts: Vec<HelloTriangleVertex>,
     pub buffer: Option<Buffer>,
 }
 
