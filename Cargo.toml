@@ -1,5 +1,5 @@
 [package]
-name = "RustRenderMetal"
+name = "rust_render_metal"
 version = "0.1.0"
 edition = "2021"
 
@@ -9,5 +9,7 @@ edition = "2021"
 cocoa = "0.25.0"
 core-graphics-types = "0.1.2"
 glam = "0.24.1"
+gltf = "1.3.0"
 metal = "0.26.0"
+stb_image = "0.2.5"
 winit = "0.28.6"

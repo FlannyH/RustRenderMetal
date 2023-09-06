@@ -1,15 +1,23 @@
-use std::{fs::File, mem};
-
+#![allow(dead_code)]
+#![allow(clippy::needless_return)]
+use std::mem;
 use cocoa::base::YES;
 use cocoa::{appkit::NSView, base::id as cocoa_id};
-use glam::{Vec2, Vec3, Vec4};
+use glam::{Vec2, Vec3};
 use metal::objc::rc::autoreleasepool;
 use metal::{Device, MetalLayer, MTLPixelFormat, LibraryRef, DeviceRef, RenderPipelineState, RenderPipelineDescriptor, MTLResourceOptions, MTLLoadAction, RenderPassDescriptor, MTLClearColor, MTLStoreAction, MTLScissorRect, MTLPrimitiveType};
 use winit::event::{Event, WindowEvent};
 use winit::event_loop::ControlFlow;
 use winit::platform::macos::WindowExtMacOS;
 use core_graphics_types::geometry::CGSize;
+use metal::foreign_types::ForeignType;
 
+mod material;
+mod mesh;
+mod texture;
+mod structs;
+mod helpers;
+mod graphics;
 
 #[repr(C)]
 #[derive(Debug)]
@@ -63,7 +71,7 @@ fn main() {
     unsafe {
         let view = window.ns_view() as cocoa_id;
         view.setWantsLayer(YES);
-        view.setLayer(mem::transmute(layer.as_ref()));
+        view.setLayer(mem::transmute(layer.as_ptr()));
     }
 
     let drawable_size = window.inner_size();
@@ -79,11 +87,12 @@ fn main() {
     let command_queue = device.new_command_queue();
 
     // Set up vertex buffer data for the triangle
-    let mut vertex_buffer_data = Vec::<HelloTriangleVertex>::new();
-    // todo: make sure the winding order is correct
-    vertex_buffer_data.push(HelloTriangleVertex{ position: Vec2{x: -0.5, y: -0.5}, color: Vec3{x: 1.0, y: 0.0, z: 0.0} });
-    vertex_buffer_data.push(HelloTriangleVertex{ position: Vec2{x: 0.5, y: -0.5}, color: Vec3{x: 0.0, y: 1.0, z: 0.0} });
-    vertex_buffer_data.push(HelloTriangleVertex{ position: Vec2{x: 0.0, y: 0.5}, color: Vec3{x: 0.0, y: 0.0, z: 1.0} });
+    let vertex_buffer_data = vec![
+        // todo: make sure the winding order is correct
+        HelloTriangleVertex{ position: Vec2{x: -0.5, y: -0.5}, color: Vec3{x: 1.0, y: 0.0, z: 0.0} },
+        HelloTriangleVertex{ position: Vec2{x: 0.5, y: -0.5}, color: Vec3{x: 0.0, y: 1.0, z: 0.0} },
+        HelloTriangleVertex{ position: Vec2{x: 0.0, y: 0.5}, color: Vec3{x: 0.0, y: 0.0, z: 1.0} },
+    ];
 
     // Create the vertex buffer on the device
     let vertex_buffer = device.new_buffer_with_data(
@@ -116,7 +125,7 @@ fn main() {
 
                     // Set up framebuffer
                     let render_pass_descriptor = RenderPassDescriptor::new();
-                    let color_attachment = render_pass_descriptor.color_attachments().object_at(0).unwrap();
+                    let color_attachment = render_pass_descriptor.color_attachments().object_at(0).expect("Failed to get color attachment");
                     color_attachment.set_texture(Some(drawable.texture()));
                     color_attachment.set_load_action(MTLLoadAction::Clear);
                     color_attachment.set_clear_color(MTLClearColor::new(0.1, 0.1, 0.2, 1.0));
@@ -124,7 +133,7 @@ fn main() {
                     
                     // Set up command buffer
                     let command_buffer = command_queue.new_command_buffer();
-                    let command_encoder = command_buffer.new_render_command_encoder(&render_pass_descriptor);
+                    let command_encoder = command_buffer.new_render_command_encoder(render_pass_descriptor);
 
                     // Record triangle draw call
                     command_encoder.set_render_pipeline_state(&hello_triangle_pipeline_state);
@@ -134,7 +143,7 @@ fn main() {
                     command_encoder.end_encoding();
 
                     // Present framebuffer
-                    command_buffer.present_drawable(&drawable);
+                    command_buffer.present_drawable(drawable);
                     command_buffer.commit();
                 }
                 _ => {}
