@@ -6,10 +6,10 @@ pub fn index_to_coords(index: usize, width: usize) -> glam::Vec2 {
 pub fn coords_to_index(x: usize, y: usize, width: usize) -> usize {
     x + (y * width)
 }
-pub fn colour_rgb(red: u8, green: u8, blue: u8) -> u32 {
+pub fn color_rgb(red: u8, green: u8, blue: u8) -> u32 {
     ((red as u32) << 16) + ((green as u32) << 8) + (blue as u32)
 }
-pub fn colour_rgba(alpha: u8, red: u8, green: u8, blue: u8) -> u32 {
+pub fn color_rgba(alpha: u8, red: u8, green: u8, blue: u8) -> u32 {
     ((alpha as u32) << 24) + ((red as u32) << 16) + ((green as u32) << 8) + (blue as u32)
 }
 

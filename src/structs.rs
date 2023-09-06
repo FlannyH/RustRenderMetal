@@ -1,11 +1,12 @@
 use glam::{Mat4, Quat, Vec2, Vec3, Vec4};
 
 #[derive(Debug, Copy, Clone)]
+#[repr(C)]
 pub struct Vertex {
     pub position: Vec3,
     pub normal: Vec3,
     pub tangent: Vec4,
-    pub colour: Vec4,
+    pub color: Vec4,
     pub uv0: Vec2,
     pub uv1: Vec2,
 }
@@ -15,7 +16,7 @@ pub struct FragIn {
     pub position: Vec4,
     pub normal: Vec3,
     pub tangent: Vec3,
-    pub colour: Vec3,
+    pub color: Vec3,
     pub uv: Vec2,
 }
 
@@ -31,7 +32,7 @@ impl FragIn {
             position: self.position.lerp(rhs.position, t),
             normal: self.normal.lerp(rhs.normal, t),
             tangent: self.tangent.lerp(rhs.tangent, t),
-            colour: self.colour.lerp(rhs.colour, t),
+            color: self.color.lerp(rhs.color, t),
             uv: self.uv.lerp(rhs.uv, t),
         }
     }

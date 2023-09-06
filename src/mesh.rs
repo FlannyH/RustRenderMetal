@@ -1,15 +1,20 @@
+use crate::HelloTriangleVertex;
 use crate::material::Material;
 use crate::structs::Transform;
 use crate::structs::Vertex;
 use glam::Vec4Swizzles;
 use glam::{Mat4, Vec2, Vec3, Vec4};
 use gltf::buffer::Data;
+use metal::Buffer;
 use std::{collections::HashMap, path::Path};
 
 pub struct Mesh {
     pub verts: Vec<Vertex>,
-    pub vao: u32,
-    pub vbo: u32,
+    pub buffer: Option<Buffer>,
+}
+pub struct MeshTiny {
+    pub verts: Vec<HelloTriangleVertex>,
+    pub buffer: Option<Buffer>,
 }
 
 pub struct Model {
@@ -73,7 +78,7 @@ fn create_vertex_array(
     let mut position_vec = Vec::<Vec3>::new();
     let mut normal_vec = Vec::<Vec3>::new();
     let mut tangent_vec = Vec::<Vec4>::new();
-    let mut colour_vec = Vec::<Vec4>::new();
+    let mut color_vec = Vec::<Vec4>::new();
     let mut texcoord0_vec = Vec::<Vec2>::new();
     let mut texcoord1_vec = Vec::<Vec2>::new();
     let mut indices = Vec::<u16>::new();
@@ -133,7 +138,7 @@ fn create_vertex_array(
                 let values = convert_gltf_buffer_to_f32(buffer_slice, &accessor);
                 for i in (0..accessor.count() * 4).step_by(4) {
                     let slice = &values[i..i + 4];
-                    colour_vec.push(Vec4::from_slice(slice));
+                    color_vec.push(Vec4::from_slice(slice));
                 }
             }
             _ => {}
@@ -167,15 +172,14 @@ fn create_vertex_array(
     // Create vertex array
     let mut mesh_out = Mesh {
         verts: Vec::new(),
-        vao: 0,
-        vbo: 0,
+        buffer: None,
     };
     for index in indices {
         let mut vertex = Vertex {
             position: Vec3::new(0., 0., 0.),
             normal: Vec3::new(0., 0., 0.),
             tangent: Vec4::new(0., 0., 0., 0.),
-            colour: Vec4::new(1., 1., 1., 1.),
+            color: Vec4::new(1., 1., 1., 1.),
             uv0: Vec2::new(0., 0.),
             uv1: Vec2::new(0., 0.),
         };
@@ -199,18 +203,18 @@ fn create_vertex_array(
         if !texcoord1_vec.is_empty() {
             vertex.uv1 = texcoord1_vec[index as usize];
         }
-        if !colour_vec.is_empty() {
-            vertex.colour.x = f32::powf(colour_vec[index as usize].x, 1.0 / 2.2);
-            if vertex.colour.x > 1.0 {
-                vertex.colour.x = 1.0
+        if !color_vec.is_empty() {
+            vertex.color.x = f32::powf(color_vec[index as usize].x, 1.0 / 2.2);
+            if vertex.color.x > 1.0 {
+                vertex.color.x = 1.0
             }
-            vertex.colour.y = f32::powf(colour_vec[index as usize].y, 1.0 / 2.2);
-            if vertex.colour.y > 1.0 {
-                vertex.colour.y = 1.0
+            vertex.color.y = f32::powf(color_vec[index as usize].y, 1.0 / 2.2);
+            if vertex.color.y > 1.0 {
+                vertex.color.y = 1.0
             }
-            vertex.colour.z = f32::powf(colour_vec[index as usize].z, 1.0 / 2.2);
-            if vertex.colour.z > 1.0 {
-                vertex.colour.z = 1.0
+            vertex.color.z = f32::powf(color_vec[index as usize].z, 1.0 / 2.2);
+            if vertex.color.z > 1.0 {
+                vertex.color.z = 1.0
             }
         }
         mesh_out.verts.push(vertex);

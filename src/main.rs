@@ -1,16 +1,12 @@
 #![allow(dead_code)]
 #![allow(clippy::needless_return)]
-use std::mem;
-use cocoa::base::YES;
-use cocoa::{appkit::NSView, base::id as cocoa_id};
-use glam::{Vec2, Vec3};
+
+use glam::{Vec2, Vec3, Vec4};
+use graphics::Renderer;
+use mesh::{Mesh, MeshTiny};
 use metal::objc::rc::autoreleasepool;
-use metal::{Device, MetalLayer, MTLPixelFormat, LibraryRef, DeviceRef, RenderPipelineState, RenderPipelineDescriptor, MTLResourceOptions, MTLLoadAction, RenderPassDescriptor, MTLClearColor, MTLStoreAction, MTLScissorRect, MTLPrimitiveType};
-use winit::event::{Event, WindowEvent};
-use winit::event_loop::ControlFlow;
-use winit::platform::macos::WindowExtMacOS;
-use core_graphics_types::geometry::CGSize;
-use metal::foreign_types::ForeignType;
+use structs::Vertex;
+use winit::{event::{Event, WindowEvent}, event_loop::ControlFlow};
 
 mod material;
 mod mesh;
@@ -21,30 +17,9 @@ mod graphics;
 
 #[repr(C)]
 #[derive(Debug)]
-struct HelloTriangleVertex {
+pub struct HelloTriangleVertex {
     position: Vec2,
     color: Vec3,
-}
-
-fn prepare_pipeline_state (
-    device: &DeviceRef,
-    library: &LibraryRef,
-    vertex_shader_path: &str,
-    fragment_shader_path: &str,
- ) -> RenderPipelineState {
-    // Get compiled functions from the library
-    let vertex_function = library.get_function(vertex_shader_path, None).unwrap();
-    let fragment_function = library.get_function(fragment_shader_path, None).unwrap();
-
-    // Create pipeline state descriptor - handles things like shader program, buffer to render to, blend mode, etc.
-    let pipeline_state_desc = RenderPipelineDescriptor::new();
-    pipeline_state_desc.set_vertex_function(Some(&vertex_function));
-    pipeline_state_desc.set_fragment_function(Some(&fragment_function));
-
-    let attachment = pipeline_state_desc.color_attachments().object_at(0).unwrap();
-    attachment.set_pixel_format(MTLPixelFormat::RGBA8Unorm);
-    attachment.set_blending_enabled(false);
-    return device.new_render_pipeline_state(&pipeline_state_desc).unwrap();
 }
 
 // Credits to https://github.com/gfx-rs/metal-rs/blob/master/examples/window/main.rs for the base structure
@@ -58,48 +33,61 @@ fn main() {
         .build(&event_loop)
         .unwrap();
 
-    // Create device
-    let device = Device::system_default().expect("Could not create device.");
-
-    // Create metal layer
-    let layer = MetalLayer::new();
-    layer.set_device(&device);
-    layer.set_pixel_format(MTLPixelFormat::RGBA8Unorm);
-    layer.set_presents_with_transaction(false);
-
-    // Create view - a sort of canvas where you draw graphics using Metal commands
-    unsafe {
-        let view = window.ns_view() as cocoa_id;
-        view.setWantsLayer(YES);
-        view.setLayer(mem::transmute(layer.as_ptr()));
-    }
-
-    let drawable_size = window.inner_size();
-    layer.set_drawable_size(CGSize::new(drawable_size.width as f64, drawable_size.height as f64));
-
+    // Initialize renderer
+    let mut renderer = Renderer::new(&window);
     // Load the Metal library file
-    let library = device.new_library_with_file("metal/shaders/hello_triangle.metallib").expect("Failed to load Metal library");
+    renderer.load_library("metal/shaders/hello_triangle.metallib");
+    renderer.prepare_pipeline_state("hello_triangle_vertex", "hello_triangle_fragment");
 
-    // Initialize the pipeline states with functions from this library
-    let hello_triangle_pipeline_state = prepare_pipeline_state(&device, &library, "hello_triangle_vertex", "hello_triangle_fragment");
-
-    // Create command queue
-    let command_queue = device.new_command_queue();
 
     // Set up vertex buffer data for the triangle
-    let vertex_buffer_data = vec![
-        // todo: make sure the winding order is correct
-        HelloTriangleVertex{ position: Vec2{x: -0.5, y: -0.5}, color: Vec3{x: 1.0, y: 0.0, z: 0.0} },
-        HelloTriangleVertex{ position: Vec2{x: 0.5, y: -0.5}, color: Vec3{x: 0.0, y: 1.0, z: 0.0} },
-        HelloTriangleVertex{ position: Vec2{x: 0.0, y: 0.5}, color: Vec3{x: 0.0, y: 0.0, z: 1.0} },
-    ];
+    let mut mesh_triangle = MeshTiny {
+        /*
+        verts: vec![
+            Vertex{ 
+                position: Vec3{x: -0.5, y: -0.5, z: 0.0}, 
+                color: Vec4{x: 1.0, y: 0.0, z: 0.0, w: 1.0},
+                normal: Vec3{x: 0.0, y: 0.0, z: 0.0},
+                tangent: Vec4{x: 0.0, y: 0.0, z: 0.0, w: 1.0},
+                uv0: Vec2{x: 0.0, y: 0.0},
+                uv1: Vec2{x: 0.0, y: 0.0},
+            },
+            Vertex{ 
+                position: Vec3{x: 0.5, y: -0.5, z: 0.0}, 
+                color: Vec4{x: 0.0, y: 1.0, z: 0.0, w: 1.0},
+                normal: Vec3{x: 0.0, y: 0.0, z: 0.0},
+                tangent: Vec4{x: 0.0, y: 0.0, z: 0.0, w: 1.0},
+                uv0: Vec2{x: 0.0, y: 0.0},
+                uv1: Vec2{x: 0.0, y: 0.0},
+            },
+            Vertex{ 
+                position: Vec3{x: 0.0, y: 0.5, z: 0.0}, 
+                color: Vec4{x: 0.0, y: 0.0, z: 1.0, w: 1.0},
+                normal: Vec3{x: 0.0, y: 0.0, z: 0.0},
+                tangent: Vec4{x: 0.0, y: 0.0, z: 0.0, w: 1.0},
+                uv0: Vec2{x: 0.0, y: 0.0},
+                uv1: Vec2{x: 0.0, y: 0.0},
+            },
+        ],
+        */
+        verts: vec![
+            HelloTriangleVertex{ 
+                position: Vec2{x: -0.5, y: -0.5}, 
+                color: Vec3{x: 1.0, y: 0.0, z: 0.0},
+            },
+            HelloTriangleVertex{ 
+                position: Vec2{x: 0.5, y: -0.5}, 
+                color: Vec3{x: 0.0, y: 1.0, z: 0.0},
+            },
+            HelloTriangleVertex{ 
+                position: Vec2{x: 0.0, y: 0.5}, 
+                color: Vec3{x: 0.0, y: 0.0, z: 1.0},
+            },
+        ],
+        buffer: None,
+    };
 
-    // Create the vertex buffer on the device
-    let vertex_buffer = device.new_buffer_with_data(
-        vertex_buffer_data.as_ptr() as *const _,
-        (vertex_buffer_data.len() * mem::size_of::<HelloTriangleVertex>()) as u64,
-        MTLResourceOptions::CPUCacheModeDefaultCache | MTLResourceOptions::StorageModeManaged,
-    );
+    renderer.upload_vertex_buffer(&mut mesh_triangle);
 
     // Main loop
     event_loop.run(move |event, _, control_flow| {
@@ -109,42 +97,15 @@ fn main() {
             match event {
                 Event::WindowEvent{event, ..} => match event {
                     WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
-                    WindowEvent::Resized(size) => layer.set_drawable_size(CGSize::new(size.width as f64, size.height as f64)),
+                    WindowEvent::Resized(size) => renderer.resize_framebuffer(size.width, size.height),
                     _ => (),
                 }
                 Event::MainEventsCleared => {
                     window.request_redraw();
                 }
                 Event::RedrawRequested(_) => {
-                    // Get the next framebuffer
-                    let drawable = match layer.next_drawable() {
-                        Some(drawable) => drawable,
-                        None => return,
-                    };
-                    let size = layer.drawable_size();
-
-                    // Set up framebuffer
-                    let render_pass_descriptor = RenderPassDescriptor::new();
-                    let color_attachment = render_pass_descriptor.color_attachments().object_at(0).expect("Failed to get color attachment");
-                    color_attachment.set_texture(Some(drawable.texture()));
-                    color_attachment.set_load_action(MTLLoadAction::Clear);
-                    color_attachment.set_clear_color(MTLClearColor::new(0.1, 0.1, 0.2, 1.0));
-                    color_attachment.set_store_action(MTLStoreAction::Store);
-                    
-                    // Set up command buffer
-                    let command_buffer = command_queue.new_command_buffer();
-                    let command_encoder = command_buffer.new_render_command_encoder(render_pass_descriptor);
-
-                    // Record triangle draw call
-                    command_encoder.set_render_pipeline_state(&hello_triangle_pipeline_state);
-                    command_encoder.set_scissor_rect(MTLScissorRect{x: 0, y: 0, width: size.width as u64, height: size.height as u64});
-                    command_encoder.set_vertex_buffer(0, Some(&vertex_buffer), 0);
-                    command_encoder.draw_primitives(MTLPrimitiveType::Triangle, 0, vertex_buffer_data.len() as u64);
-                    command_encoder.end_encoding();
-
-                    // Present framebuffer
-                    command_buffer.present_drawable(drawable);
-                    command_buffer.commit();
+                    renderer.render_frame(&mesh_triangle);
+                    window.request_redraw();
                 }
                 _ => {}
             }

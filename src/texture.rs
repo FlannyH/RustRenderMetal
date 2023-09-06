@@ -49,7 +49,7 @@ impl Texture {
             if image.depth == 4 {
                 let data = (0..image.data.len() / 4)
                     .map(|id| {
-                        colour_rgba(
+                        color_rgba(
                             image.data[id * 4 + 3],
                             image.data[id * 4],
                             image.data[id * 4 + 1],
@@ -67,7 +67,7 @@ impl Texture {
             } else if image.depth == 3 {
                 let data = (0..image.data.len() / 3)
                     .map(|id| {
-                        colour_rgba(
+                        color_rgba(
                             255,
                             image.data[id * 3],
                             image.data[id * 3 + 1],
