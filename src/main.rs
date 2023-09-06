@@ -12,15 +12,10 @@ use core_graphics_types::geometry::CGSize;
 
 
 #[repr(C)]
+#[derive(Debug)]
 struct HelloTriangleVertex {
     position: Vec2,
     color: Vec3,
-}
-
-#[repr(C)]
-struct ClearRect {
-    pub rect: Vec4,
-    pub color: Vec4,
 }
 
 fn prepare_pipeline_state (
@@ -86,9 +81,9 @@ fn main() {
     // Set up vertex buffer data for the triangle
     let mut vertex_buffer_data = Vec::<HelloTriangleVertex>::new();
     // todo: make sure the winding order is correct
-    vertex_buffer_data.push(HelloTriangleVertex{ position: Vec2{x: -1.0, y: 1.0}, color: Vec3{x: 1.0, y: 0.0, z: 0.0} });
-    vertex_buffer_data.push(HelloTriangleVertex{ position: Vec2{x: 1.0, y: 1.0}, color: Vec3{x: 0.0, y: 1.0, z: 0.0} });
-    vertex_buffer_data.push(HelloTriangleVertex{ position: Vec2{x: 0.0, y: 0.0}, color: Vec3{x: 0.0, y: 0.0, z: 1.0} });
+    vertex_buffer_data.push(HelloTriangleVertex{ position: Vec2{x: -0.5, y: -0.5}, color: Vec3{x: 1.0, y: 0.0, z: 0.0} });
+    vertex_buffer_data.push(HelloTriangleVertex{ position: Vec2{x: 0.5, y: -0.5}, color: Vec3{x: 0.0, y: 1.0, z: 0.0} });
+    vertex_buffer_data.push(HelloTriangleVertex{ position: Vec2{x: 0.0, y: 0.5}, color: Vec3{x: 0.0, y: 0.0, z: 1.0} });
 
     // Create the vertex buffer on the device
     let vertex_buffer = device.new_buffer_with_data(
@@ -96,6 +91,7 @@ fn main() {
         (vertex_buffer_data.len() * mem::size_of::<HelloTriangleVertex>()) as u64,
         MTLResourceOptions::CPUCacheModeDefaultCache | MTLResourceOptions::StorageModeManaged,
     );
+    println!("buffer is {} bytes long", vertex_buffer.length());
 
     // Main loop
     event_loop.run(move |event, _, control_flow| {
@@ -131,10 +127,20 @@ fn main() {
                     let command_encoder = command_buffer.new_render_command_encoder(&render_pass_descriptor);
 
                     // Record triangle draw call
+
                     println!("{}", vertex_buffer_data.len());
+                    println!("{}", vertex_buffer.length());
+                    println!("{}", vertex_buffer.allocated_size());
+                    unsafe {
+                        //&*(vertex_buffer.contents() as *const HelloTriangleVertex)
+                        println!("{:?}", &*(vertex_buffer.contents() as *const HelloTriangleVertex));
+                        println!("{:?}", *((vertex_buffer.contents() as *mut HelloTriangleVertex).wrapping_add(1)));
+                        println!("{:?}", *((vertex_buffer.contents() as *mut HelloTriangleVertex).wrapping_add(2)));
+                    }
+                    command_encoder.set_render_pipeline_state(&hello_triangle_pipeline_state);
                     command_encoder.set_scissor_rect(MTLScissorRect{x: 0, y: 0, width: drawable_size.width as u64, height: drawable_size.height as u64});
                     command_encoder.set_vertex_buffer(0, Some(&vertex_buffer), 0);
-                    //command_encoder.draw_primitives(MTLPrimitiveType::Triangle, 0, vertex_buffer_data.len() as u64);
+                    command_encoder.draw_primitives(MTLPrimitiveType::Triangle, 0, vertex_buffer_data.len() as u64);
                     command_encoder.end_encoding();
 
                     // Present framebuffer
