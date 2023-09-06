@@ -1,9 +1,11 @@
 #![allow(dead_code)]
 #![allow(clippy::needless_return)]
 
+use std::{path::Path, hash::Hash};
+
 use glam::{Vec2, Vec3, Vec4};
 use graphics::Renderer;
-use mesh::Mesh;
+use mesh::{Mesh, Model};
 use metal::objc::rc::autoreleasepool;
 use structs::Vertex;
 use winit::{event::{Event, WindowEvent}, event_loop::ControlFlow};
@@ -35,7 +37,6 @@ fn main() {
 
     // Set up vertex buffer data for the triangle
     let mut mesh_triangle = Mesh {
-
         verts: vec![
             Vertex{ 
                 position: Vec3{x: -0.5, y: -0.5, z: 0.0}, 
@@ -64,8 +65,14 @@ fn main() {
         ],
         buffer: None,
     };
+    let mut model_suzanne = Model::load_gltf(Path::new("./assets/suzanne.gltf")).expect("Could not find suzanne.gltf");
+    let mut mesh_suzanne = Mesh{ verts: Vec::new(), buffer: None };
 
-    renderer.upload_vertex_buffer(&mut mesh_triangle);
+    for (_key, value) in model_suzanne.meshes {
+        mesh_suzanne = value;
+    }
+
+    renderer.upload_vertex_buffer(&mut mesh_suzanne);
 
     // Main loop
     event_loop.run(move |event, _, control_flow| {
@@ -82,7 +89,7 @@ fn main() {
                     window.request_redraw();
                 }
                 Event::RedrawRequested(_) => {
-                    renderer.render_frame(&mesh_triangle);
+                    renderer.render_frame(&mesh_suzanne);
                     window.request_redraw();
                 }
                 _ => {}
