@@ -1,13 +1,12 @@
 #![allow(dead_code)]
 #![allow(clippy::needless_return)]
 
-use std::{path::Path, hash::Hash, f32::consts::PI};
+use std::{path::Path, f32::consts::PI};
 
-use glam::{Vec2, Vec3, Vec4, Mat4};
-use graphics::Renderer;
-use mesh::{Mesh, Model};
+use glam::{Vec4, Mat4};
+use graphics::{Renderer, ModelQueueEntry};
 use metal::objc::rc::autoreleasepool;
-use structs::{Vertex, ConstBuffer};
+use structs::ConstBuffer;
 use winit::{event::{Event, WindowEvent}, event_loop::ControlFlow};
 
 mod material;
@@ -34,45 +33,7 @@ fn main() {
     renderer.load_library("metal/shaders/hello_triangle.metallib");
     renderer.prepare_pipeline_state("hello_triangle_vertex", "hello_triangle_fragment");
 
-
-    // Set up vertex buffer data for the triangle
-    let mut mesh_triangle = Mesh {
-        verts: vec![
-            Vertex{ 
-                position: Vec3{x: -0.5, y: -0.5, z: 0.0}, 
-                color: Vec4{x: 1.0, y: 0.0, z: 0.0, w: 1.0},
-                normal: Vec3{x: 0.0, y: 0.0, z: 0.0},
-                tangent: Vec4{x: 0.0, y: 0.0, z: 0.0, w: 1.0},
-                uv0: Vec2{x: 0.0, y: 0.0},
-                uv1: Vec2{x: 0.0, y: 0.0},
-            },
-            Vertex{ 
-                position: Vec3{x: 0.5, y: -0.5, z: 0.0}, 
-                color: Vec4{x: 0.0, y: 1.0, z: 0.0, w: 1.0},
-                normal: Vec3{x: 0.0, y: 0.0, z: 0.0},
-                tangent: Vec4{x: 0.0, y: 0.0, z: 0.0, w: 1.0},
-                uv0: Vec2{x: 0.0, y: 0.0},
-                uv1: Vec2{x: 0.0, y: 0.0},
-            },
-            Vertex{ 
-                position: Vec3{x: 0.0, y: 0.5, z: 0.0}, 
-                color: Vec4{x: 0.0, y: 0.0, z: 1.0, w: 1.0},
-                normal: Vec3{x: 0.0, y: 0.0, z: 0.0},
-                tangent: Vec4{x: 0.0, y: 0.0, z: 0.0, w: 1.0},
-                uv0: Vec2{x: 0.0, y: 0.0},
-                uv1: Vec2{x: 0.0, y: 0.0},
-            },
-        ],
-        buffer: None,
-    };
-    let model_suzanne = Model::load_gltf(Path::new("./assets/suzanne.gltf")).expect("Could not find suzanne.gltf");
-    let mut mesh_suzanne = Mesh{ verts: Vec::new(), buffer: None };
-
-    for (_key, value) in model_suzanne.meshes {
-        mesh_suzanne = value;
-    }
-
-    renderer.upload_vertex_buffer(&mut mesh_suzanne);
+    let model_suzanne = renderer.load_model(Path::new("./assets/suzanne.gltf")).unwrap();
 
     // Create const buffer
     let mut const_buffer = ConstBuffer{
@@ -102,7 +63,9 @@ fn main() {
                     window.request_redraw();
                 }
                 Event::RedrawRequested(_) => {
-                    renderer.render_frame(&mesh_suzanne);
+                    renderer.begin_frame();
+                    renderer.draw_model(ModelQueueEntry{model_id: model_suzanne});
+                    renderer.end_frame();
                     window.request_redraw();
                 }
                 _ => {}

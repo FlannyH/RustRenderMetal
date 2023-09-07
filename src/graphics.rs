@@ -1,4 +1,5 @@
 use std::mem;
+use std::path::Path;
 
 use cocoa::appkit::NSView;
 use cocoa::base::YES;
@@ -9,8 +10,13 @@ use winit::platform::macos::WindowExtMacOS;
 use metal::MTLLoadAction;
 use winit::window::Window;
 
-use crate::mesh::Mesh;
+use crate::mesh::{Mesh, Model};
 use crate::structs::{Vertex, ConstBuffer};
+
+// Todo: add transform
+pub struct ModelQueueEntry {
+    pub model_id: usize,
+}
 
 pub struct Renderer{
     pub device: Option<Device>,
@@ -19,9 +25,11 @@ pub struct Renderer{
     command_queue: Option<CommandQueue>,
     layer: Option<MetalLayer>,
     const_buffer: Option<Buffer>,
+    loaded_models: Vec<Model>,
+    model_queue: Vec<ModelQueueEntry>,
 }
 
-impl Renderer {
+impl Renderer{
     pub fn new(window: &Window) -> Self {
         // Initialize renderer with none
         let mut renderer = Renderer {
@@ -31,6 +39,8 @@ impl Renderer {
             library: None,
             layer: None,
             const_buffer: None,
+            model_queue: Vec::new(),
+            loaded_models: Vec::new(),
         };
 
         // Create device
@@ -101,8 +111,11 @@ impl Renderer {
         ));
     }
 
-    // mesh will be removed as parameter, it's here temporarily to have something working
-    pub fn render_frame(&self, mesh: &Mesh) {
+    pub fn begin_frame(&mut self) {
+        self.model_queue.clear();
+    }
+
+    pub fn end_frame(&self) {
         // Get the next framebuffer
         let drawable = match self.layer.as_ref().unwrap().next_drawable() {
             Some(drawable) => drawable,
@@ -133,9 +146,16 @@ impl Renderer {
             znear: -1.0,
             zfar: 1.0,
         });
-        command_encoder.set_vertex_buffer(0, Some(mesh.buffer.as_ref().unwrap()), 0);
         command_encoder.set_vertex_buffer(1, Some(self.const_buffer.as_ref().unwrap()), 0);
-        command_encoder.draw_primitives(MTLPrimitiveType::Triangle, 0, mesh.verts.len() as u64);
+        for model_id in &self.model_queue {
+            let model = &self.loaded_models[model_id.model_id];
+            for name in model.meshes.keys() {
+                let mesh = model.meshes.get(name).unwrap();
+                let _material = model.materials.get(name);
+                command_encoder.set_vertex_buffer(0, Some(mesh.buffer.as_ref().unwrap()), 0);
+                command_encoder.draw_primitives(MTLPrimitiveType::Triangle, 0, mesh.verts.len() as u64);
+            }
+        }
         command_encoder.end_encoding();
 
         // Present framebuffer
@@ -148,6 +168,22 @@ impl Renderer {
         self.layer.as_ref().unwrap().set_drawable_size(CGSize::new(width as f64, height as f64));
     }
 
-    pub fn draw_mesh(&self, _mesh: &Mesh) {
+    pub fn draw_model(&mut self, model_queue_entry: ModelQueueEntry) {
+        self.model_queue.push(model_queue_entry);
+    }
+
+    pub fn load_model(&mut self, path: &Path) -> Option<usize> {
+        let mut model = match Model::load_gltf(path) {
+            Ok(mdl) => mdl,
+            Err(s) => {println!("Error loading model \"{}\": {s}", path.display()); return None;}
+        };
+        
+        for (name, mesh) in &mut model.meshes {
+            println!("Uploading mesh {name}");
+            self.upload_vertex_buffer(mesh);
+        }
+
+        self.loaded_models.push(model);
+        return Some(self.loaded_models.len() - 1);
     }
 }
