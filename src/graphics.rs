@@ -1,9 +1,11 @@
+use std::f32::consts::PI;
 use std::mem;
 use std::path::Path;
 
 use cocoa::appkit::NSView;
 use cocoa::base::YES;
 use core_graphics_types::geometry::CGSize;
+use glam::Mat4;
 use metal::{Device, MetalLayer, MTLPixelFormat, RenderPipelineState, RenderPipelineDescriptor, CommandQueue, Library, MTLResourceOptions, RenderPassDescriptor, MTLClearColor, MTLStoreAction, MTLScissorRect, MTLPrimitiveType, MTLViewport, Buffer};
 use metal::foreign_types::ForeignType;
 use winit::platform::macos::WindowExtMacOS;
@@ -11,7 +13,7 @@ use metal::MTLLoadAction;
 use winit::window::Window;
 
 use crate::mesh::{Mesh, Model};
-use crate::structs::{Vertex, ConstBuffer};
+use crate::structs::{Vertex, ConstBuffer, Transform};
 
 // Todo: add transform
 pub struct ModelQueueEntry {
@@ -24,7 +26,8 @@ pub struct Renderer{
     library: Option<Library>,
     command_queue: Option<CommandQueue>,
     layer: Option<MetalLayer>,
-    const_buffer: Option<Buffer>,
+    const_buffer_gpu: Option<Buffer>,
+    const_buffer_cpu: ConstBuffer,
     loaded_models: Vec<Model>,
     model_queue: Vec<ModelQueueEntry>,
 }
@@ -38,7 +41,12 @@ impl Renderer{
             command_queue: None,
             library: None,
             layer: None,
-            const_buffer: None,
+            const_buffer_cpu: ConstBuffer{
+                model_matrix: Mat4::IDENTITY,
+                view_matrix: Mat4::IDENTITY,
+                proj_matrix: Mat4::IDENTITY,
+            },
+            const_buffer_gpu: None,
             model_queue: Vec::new(),
             loaded_models: Vec::new(),
         };
@@ -102,15 +110,6 @@ impl Renderer{
         ));
     }
 
-    pub fn upload_const_buffer(&mut self, const_buffer: &mut ConstBuffer) {
-        // Create the constant buffer on the device
-        self.const_buffer = Some(self.device.as_ref().unwrap().new_buffer_with_data(
-            const_buffer as *mut _ as *const std::ffi::c_void,
-            mem::size_of::<ConstBuffer>() as u64,
-            MTLResourceOptions::CPUCacheModeDefaultCache | MTLResourceOptions::StorageModeManaged,
-        ));
-    }
-
     pub fn begin_frame(&mut self) {
         self.model_queue.clear();
     }
@@ -146,7 +145,7 @@ impl Renderer{
             znear: -1.0,
             zfar: 1.0,
         });
-        command_encoder.set_vertex_buffer(1, Some(self.const_buffer.as_ref().unwrap()), 0);
+        command_encoder.set_vertex_buffer(1, Some(self.const_buffer_gpu.as_ref().unwrap()), 0);
         for model_id in &self.model_queue {
             let model = &self.loaded_models[model_id.model_id];
             for name in model.meshes.keys() {
@@ -185,5 +184,18 @@ impl Renderer{
 
         self.loaded_models.push(model);
         return Some(self.loaded_models.len() - 1);
+    }
+
+    pub fn update_camera(&mut self, camera_transform: &Transform) {
+        // Update CPU-side buffer
+        self.const_buffer_cpu.view_matrix = camera_transform.view_matrix().transpose();
+        self.const_buffer_cpu.proj_matrix = Mat4::perspective_rh_gl(PI / 4.0, 16.0 / 9.0, 0.1, 1000.0).transpose();
+
+        // Update GPU-side buffer
+        self.const_buffer_gpu = Some(self.device.as_ref().unwrap().new_buffer_with_data(
+            &mut self.const_buffer_cpu as *mut _ as *const std::ffi::c_void,
+            mem::size_of::<ConstBuffer>() as u64,
+            MTLResourceOptions::CPUCacheModeDefaultCache | MTLResourceOptions::StorageModeManaged,
+        ));
     }
 }

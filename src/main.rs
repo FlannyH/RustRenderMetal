@@ -1,12 +1,11 @@
 #![allow(dead_code)]
 #![allow(clippy::needless_return)]
 
-use std::{path::Path, f32::consts::PI};
-
-use glam::{Vec4, Mat4};
+use std::path::Path;
+use glam::{Vec3, Quat};
 use graphics::{Renderer, ModelQueueEntry};
 use metal::objc::rc::autoreleasepool;
-use structs::ConstBuffer;
+use structs::Transform;
 use winit::{event::{Event, WindowEvent}, event_loop::ControlFlow};
 
 mod material;
@@ -33,20 +32,13 @@ fn main() {
     renderer.load_library("metal/shaders/hello_triangle.metallib");
     renderer.prepare_pipeline_state("hello_triangle_vertex", "hello_triangle_fragment");
 
-    let model_suzanne = renderer.load_model(Path::new("./assets/suzanne.gltf")).unwrap();
+    let model_suzanne = renderer.load_model(Path::new("./assets/sub_nivis_gun.gltf")).unwrap();
 
-    // Create const buffer
-    let mut const_buffer = ConstBuffer{
-        model_matrix: Mat4::IDENTITY,
-        view_matrix: Mat4 {
-            x_axis: Vec4{x: 0.5, y: 0.0, z: 0.0, w: 0.0},
-            y_axis: Vec4{x: 0.0, y: 1.0, z: 0.0, w: 0.0},
-            z_axis: Vec4{x: 0.0, y: 0.0, z: 1.0, w: 0.0},
-            w_axis: Vec4{x: 0.0, y: 0.0, z: 0.0, w: 1.0},
-        },
-        proj_matrix: Mat4::perspective_rh(PI / 4.0, 16.0/9.0, 0.1, 1000.0).transpose(),
+    let mut camera = Transform {
+        translation: Vec3 {x: 0.0, y: 0.0, z: -1.0},
+        rotation: Quat::IDENTITY,
+        scale: Vec3 {x: 1.0, y: 1.0, z: 1.0},
     };
-    renderer.upload_const_buffer(&mut const_buffer);
 
     // Main loop
     event_loop.run(move |event, _, control_flow| {
@@ -63,6 +55,8 @@ fn main() {
                     window.request_redraw();
                 }
                 Event::RedrawRequested(_) => {
+                    camera.translation.z += 0.01;
+                    renderer.update_camera(&camera);
                     renderer.begin_frame();
                     renderer.draw_model(ModelQueueEntry{model_id: model_suzanne});
                     renderer.end_frame();

@@ -29,17 +29,22 @@ struct vertex_shader_output_t {
 vertex vertex_shader_output_t hello_triangle_vertex(
     const device vertex_t* vertex_array [[buffer(0)]], 
     const constant const_buffer_t* const_buffer [[buffer(1)]],
-    uint vertex_index [[vertex_id]]) 
-{
+    uint vertex_index [[vertex_id]]
+) {
     vertex_shader_output_t out;
     const device vertex_t& vtx = vertex_array[vertex_index];
     out.color = float4(vtx.normal.r, vtx.normal.g, vtx.normal.b, 1.0);
-    out.position = float4(vtx.position.x, vtx.position.y, vtx.position.z - 7.0, 1.0);
+    out.position = float4(vtx.position.x, vtx.position.y, vtx.position.z, 1.0);
+    out.position *= const_buffer->model_matrix;
+    out.position *= const_buffer->view_matrix;
     out.position *= const_buffer->proj_matrix;
     return out;
 }
 
 // Fragment shader function
-fragment float4 hello_triangle_fragment(vertex_shader_output_t in [[stage_in]]) {
+fragment float4 hello_triangle_fragment(
+    vertex_shader_output_t in [[stage_in]]
+    //texture2d<float> tex_color [[texture(0)]]
+) {
     return in.color;
 }
