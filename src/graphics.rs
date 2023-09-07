@@ -88,14 +88,14 @@ impl Renderer{
         renderer.command_queue = Some(renderer.device.as_ref().unwrap().new_command_queue());
 
         // Initialize default white texture
-        let tex_white = Some(Texture {
+        let mut tex_white = Texture {
             gl_id: 0,
             width: 1,
             height: 1,
             depth: 1,
             data: vec![0xFFFFFFFFu32]
-        });
-        renderer.tex_white = renderer.upload_texture(&mut tex_white.unwrap());
+        };
+        renderer.tex_white = renderer.upload_texture(&mut tex_white);
 
         return renderer;
     }

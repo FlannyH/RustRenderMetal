@@ -47,7 +47,7 @@ fn main() {
     let mut time_prev = Instant::now();
     let mut key_held = HashMap::<VirtualKeyCode, bool>::new();
     let mut mouse_held = HashMap::<MouseButton, bool>::new();
-    let mut camera_speed = 1.0;
+    let camera_speed = 1.0;
     let mut delta_mouse_pos = Some(Vec2{x:0.0, y: 0.0});
     let mut camera_rotation = Vec3{x: 0.0, y: 0.0, z: 0.0};
     let mouse_sensitivity = -0.01;
@@ -59,7 +59,7 @@ fn main() {
                 Event::WindowEvent{event, ..} => match event {
                     WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
                     WindowEvent::Resized(size) => renderer.resize_framebuffer(size.width, size.height),
-                    WindowEvent::KeyboardInput { device_id, input, is_synthetic } => {
+                    WindowEvent::KeyboardInput { device_id: _, input, is_synthetic: _ } => {
                         match input.state {
                             winit::event::ElementState::Pressed => {
                                 if input.virtual_keycode.is_some() {
@@ -73,8 +73,7 @@ fn main() {
                             }
                         };
                     },
-                    WindowEvent::MouseWheel { device_id, delta, phase, .. } => {},
-                    WindowEvent::MouseInput { device_id, state, button, .. } => {
+                    WindowEvent::MouseInput { device_id: _, state, button, .. } => {
                         match state {
                             winit::event::ElementState::Pressed => mouse_held.insert(button, true),
                             winit::event::ElementState::Released => mouse_held.insert(button, false)
@@ -82,11 +81,8 @@ fn main() {
                     },
                     _ => (),
                 }
-                Event::DeviceEvent{ device_id, event } => match event {
-                    DeviceEvent::MouseMotion { delta } => {
-                        delta_mouse_pos = Some(Vec2{x: delta.0 as f32, y: delta.1 as f32});
-                    },
-                    _ => (),
+                Event::DeviceEvent{ device_id: _, event } => if let DeviceEvent::MouseMotion { delta } = event {
+                    delta_mouse_pos = Some(Vec2{x: delta.0 as f32, y: delta.1 as f32});
                 },
                 Event::MainEventsCleared => {
                     window.request_redraw();
@@ -96,14 +92,14 @@ fn main() {
                     time_curr = Instant::now();
                     let delta_time = (time_curr - time_prev).as_secs_f32();
                     x += delta_time * 2.0;
-                    if *key_held.entry(VirtualKeyCode::D).or_insert(false) == true {camera.translation += delta_time * camera_speed * camera.right();}
-                    if *key_held.entry(VirtualKeyCode::A).or_insert(false) == true {camera.translation -= delta_time * camera_speed * camera.right();}
-                    if *key_held.entry(VirtualKeyCode::W).or_insert(false) == true {camera.translation += delta_time * camera_speed * camera.forward();}
-                    if *key_held.entry(VirtualKeyCode::S).or_insert(false) == true {camera.translation -= delta_time * camera_speed * camera.forward();}
-                    if *key_held.entry(VirtualKeyCode::Space).or_insert(false) == true {camera.translation += delta_time * camera_speed * camera.up();}
-                    if *key_held.entry(VirtualKeyCode::LShift).or_insert(false) == true {camera.translation -= delta_time * camera_speed * camera.up();}
+                    if *key_held.entry(VirtualKeyCode::D).or_insert(false) {camera.translation += delta_time * camera_speed * camera.right();}
+                    if *key_held.entry(VirtualKeyCode::A).or_insert(false) {camera.translation -= delta_time * camera_speed * camera.right();}
+                    if *key_held.entry(VirtualKeyCode::W).or_insert(false) {camera.translation += delta_time * camera_speed * camera.forward();}
+                    if *key_held.entry(VirtualKeyCode::S).or_insert(false) {camera.translation -= delta_time * camera_speed * camera.forward();}
+                    if *key_held.entry(VirtualKeyCode::Space).or_insert(false) {camera.translation += delta_time * camera_speed * camera.up();}
+                    if *key_held.entry(VirtualKeyCode::LShift).or_insert(false) {camera.translation -= delta_time * camera_speed * camera.up();}
                     if let Some(delta_mouse) = delta_mouse_pos {
-                        if *mouse_held.entry(MouseButton::Right).or_insert(false) == true {
+                        if *mouse_held.entry(MouseButton::Right).or_insert(false) {
                             camera_rotation.x += delta_mouse.x * mouse_sensitivity;
                             camera_rotation.y += delta_mouse.y * mouse_sensitivity;
                             delta_mouse_pos = None;
