@@ -56,7 +56,7 @@ fn main() {
                     window.request_redraw();
                 }
                 Event::RedrawRequested(_) => {
-                    x += 0.01;
+                    x += 0.02;
                     renderer.update_camera(&camera);
                     renderer.begin_frame();
                     renderer.draw_model(ModelQueueEntry{

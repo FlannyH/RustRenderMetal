@@ -36,7 +36,7 @@ vertex vertex_shader_output_t hello_triangle_vertex(
     const device vertex_t& vtx = vertex_array[vertex_index];
     float shading = dot(vtx.normal, normalize(float3(0.3, 0.3, 0.3)));
     shading = clamp(shading, 0.0, 1.0);
-    out.color = float4(shading, shading, shading, 1.0);
+    out.color = float4(vtx.color.r, vtx.color.g, vtx.color.b, 1.0);
     out.position = float4(vtx.position.x, vtx.position.y, vtx.position.z, 1.0);
     out.position *= const_buffer->model_matrix;
     out.position *= const_buffer->view_matrix;

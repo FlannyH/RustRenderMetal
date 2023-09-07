@@ -6,7 +6,7 @@ use cocoa::appkit::NSView;
 use cocoa::base::YES;
 use core_graphics_types::geometry::CGSize;
 use glam::Mat4;
-use metal::{Device, MetalLayer, MTLPixelFormat, RenderPipelineState, RenderPipelineDescriptor, CommandQueue, Library, MTLResourceOptions, RenderPassDescriptor, MTLClearColor, MTLStoreAction, MTLScissorRect, MTLPrimitiveType, MTLViewport, Buffer, TextureDescriptor, MTLRegion, MTLSize, MTLOrigin};
+use metal::{Device, MetalLayer, MTLPixelFormat, RenderPipelineState, RenderPipelineDescriptor, CommandQueue, Library, MTLResourceOptions, RenderPassDescriptor, MTLClearColor, MTLStoreAction, MTLScissorRect, MTLPrimitiveType, MTLViewport, Buffer, TextureDescriptor, MTLRegion, MTLSize, MTLOrigin, DepthStencilDescriptor, MTLCompareFunction, DepthStencilState};
 use metal::foreign_types::ForeignType;
 use winit::platform::macos::WindowExtMacOS;
 use metal::MTLLoadAction;
@@ -33,6 +33,8 @@ pub struct Renderer{
     loaded_models: Vec<Model>,
     loaded_textures: Vec<metal::Texture>,
     model_queue: Vec<ModelQueueEntry>,
+    depth_texture: Option<metal::Texture>,
+    depth_stencil_state: Option<DepthStencilState>,
 }
 
 impl Renderer{
@@ -53,6 +55,8 @@ impl Renderer{
             model_queue: Vec::new(),
             loaded_models: Vec::new(),
             loaded_textures: Vec::new(),
+            depth_texture: None,
+            depth_stencil_state: None,
         };
 
         // Create device
@@ -73,6 +77,9 @@ impl Renderer{
 
         // Store the view size
         let drawable_size = window.inner_size();
+
+        // Resize framebuffer
+        renderer.resize_framebuffer(drawable_size.width, drawable_size.height);
         renderer.layer.as_ref().unwrap().set_drawable_size(CGSize::new(drawable_size.width as f64, drawable_size.height as f64));
 
         // Create command queue
@@ -98,12 +105,18 @@ impl Renderer{
         let pipeline_state_desc = RenderPipelineDescriptor::new();
         pipeline_state_desc.set_vertex_function(Some(&vertex_function));
         pipeline_state_desc.set_fragment_function(Some(&fragment_function));
+        pipeline_state_desc.set_depth_attachment_pixel_format(MTLPixelFormat::Depth32Float);
 
         let color_attachment = pipeline_state_desc.color_attachments().object_at(0).unwrap();
         color_attachment.set_pixel_format(MTLPixelFormat::RGBA8Unorm);
         color_attachment.set_blending_enabled(false);
 
         self.pipeline_state = Some(self.device.as_ref().unwrap().new_render_pipeline_state(&pipeline_state_desc).unwrap());
+
+        let depth_stencil_desc = DepthStencilDescriptor::new();
+        depth_stencil_desc.set_depth_write_enabled(true);
+        depth_stencil_desc.set_depth_compare_function(MTLCompareFunction::Less);
+        self.depth_stencil_state = Some(self.device.as_ref().unwrap().new_depth_stencil_state(&depth_stencil_desc));
     }
 
     pub fn upload_vertex_buffer(&mut self, mesh: &mut Mesh) {
@@ -138,7 +151,10 @@ impl Renderer{
 
         // Set up depth buffer
         let depth_attachment = render_pass_descriptor.depth_attachment().unwrap();
+        depth_attachment.set_texture(Some(self.depth_texture.as_ref().unwrap()));
+        depth_attachment.set_load_action(MTLLoadAction::Clear);
         depth_attachment.set_clear_depth(1.0);
+        depth_attachment.set_store_action(MTLStoreAction::Store);
 
         // Set up command buffer
         let command_buffer = self.command_queue.as_ref().unwrap().new_command_buffer();
@@ -146,6 +162,7 @@ impl Renderer{
 
         // Record mesh draw calls
         command_encoder.set_render_pipeline_state(self.pipeline_state.as_ref().unwrap().as_ref());
+        command_encoder.set_depth_stencil_state(self.depth_stencil_state.as_ref().unwrap());
         command_encoder.set_cull_mode(metal::MTLCullMode::None);
         command_encoder.set_scissor_rect(MTLScissorRect{x: 0, y: 0, width: size.width as u64, height: size.height as u64});
         command_encoder.set_viewport(MTLViewport{
@@ -180,6 +197,12 @@ impl Renderer{
     pub fn resize_framebuffer(&mut self, width: u32, height: u32) {
         println!("framebuffer resized to {width}, {height}");
         self.layer.as_ref().unwrap().set_drawable_size(CGSize::new(width as f64, height as f64));
+        
+        let depth_texture_desc = TextureDescriptor::new();
+        depth_texture_desc.set_width(width as u64);
+        depth_texture_desc.set_height(height as u64);
+        depth_texture_desc.set_pixel_format(MTLPixelFormat::Depth32Float);
+        self.depth_texture = Some(self.device.as_ref().unwrap().new_texture(&depth_texture_desc));
     }
 
     pub fn draw_model(&mut self, model_queue_entry: ModelQueueEntry) {
@@ -204,7 +227,7 @@ impl Renderer{
     pub fn update_camera(&mut self, camera_transform: &Transform) {
         // Update CPU-side buffer
         self.const_buffer_cpu.view_matrix = camera_transform.view_matrix().transpose();
-        self.const_buffer_cpu.proj_matrix = Mat4::perspective_rh_gl(PI / 4.0, 16.0 / 9.0, 0.1, 1000.0).transpose();
+        self.const_buffer_cpu.proj_matrix = Mat4::perspective_rh(PI / 4.0, 16.0 / 9.0, 0.1, 1000.0).transpose();
 
         // Update GPU-side buffer
         if self.const_buffer_gpu.is_none() {
