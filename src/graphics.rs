@@ -175,7 +175,7 @@ impl Renderer{
         });
         command_encoder.set_vertex_buffer(1, Some(self.const_buffer_gpu.as_ref().unwrap()), 0);
         for model_id in &self.model_queue {
-            self.const_buffer_cpu.model_matrix = model_id.transform.local_matrix();
+            self.const_buffer_cpu.model_matrix = model_id.transform.local_matrix().transpose();
             Self::update_const_buffer_gpu(self.const_buffer_gpu.as_mut().unwrap(), &self.const_buffer_cpu);
             
             let model = &self.loaded_models[model_id.model_id];

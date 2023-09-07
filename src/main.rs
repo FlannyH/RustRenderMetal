@@ -1,12 +1,12 @@
 #![allow(dead_code)]
 #![allow(clippy::needless_return)]
 
-use std::path::Path;
-use glam::{Vec3, Quat};
+use std::{path::Path, collections::HashMap, time::Instant};
+use glam::{Vec3, Quat, Vec2};
 use graphics::{Renderer, ModelQueueEntry};
 use metal::objc::rc::autoreleasepool;
 use structs::Transform;
-use winit::{event::{Event, WindowEvent}, event_loop::ControlFlow};
+use winit::{event::{Event, WindowEvent, VirtualKeyCode, DeviceEvent, MouseButton}, event_loop::ControlFlow};
 
 mod material;
 mod mesh;
@@ -34,7 +34,7 @@ fn main() {
 
     let model_suzanne = renderer.load_model(Path::new("./assets/sub_nivis_gun.gltf")).unwrap();
 
-    let camera = Transform {
+    let mut camera = Transform {
         translation: Vec3 {x: 0.0, y: 0.0, z: 0.5},
         rotation: Quat::IDENTITY,
         scale: Vec3 {x: 1.0, y: 1.0, z: 1.0},
@@ -42,6 +42,14 @@ fn main() {
 
     // Main loop
     let mut x = 0.0;
+    let mut time_curr = Instant::now();
+    let mut time_prev = Instant::now();
+    let mut key_held = HashMap::<VirtualKeyCode, bool>::new();
+    let mut mouse_held = HashMap::<MouseButton, bool>::new();
+    let mut camera_speed = 1.0;
+    let mut delta_mouse_pos = Some(Vec2{x:0.0, y: 0.0});
+    let mut camera_rotation = Vec3{x: 0.0, y: 0.0, z: 0.0};
+    let mouse_sensitivity = -0.01;
     event_loop.run(move |event, _, control_flow| {
         autoreleasepool(|| {
             *control_flow = ControlFlow::Poll;
@@ -50,13 +58,56 @@ fn main() {
                 Event::WindowEvent{event, ..} => match event {
                     WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
                     WindowEvent::Resized(size) => renderer.resize_framebuffer(size.width, size.height),
+                    WindowEvent::KeyboardInput { device_id, input, is_synthetic } => {
+                        match input.state {
+                            winit::event::ElementState::Pressed => {
+                                if input.virtual_keycode.is_some() {
+                                    key_held.insert(input.virtual_keycode.unwrap(), true);
+                                }
+                            },
+                            winit::event::ElementState::Released => {
+                                if input.virtual_keycode.is_some() {
+                                    key_held.insert(input.virtual_keycode.unwrap(), false);
+                                }
+                            }
+                        };
+                    },
+                    WindowEvent::MouseWheel { device_id, delta, phase, .. } => {},
+                    WindowEvent::MouseInput { device_id, state, button, .. } => {
+                        match state {
+                            winit::event::ElementState::Pressed => mouse_held.insert(button, true),
+                            winit::event::ElementState::Released => mouse_held.insert(button, false)
+                        };
+                    },
                     _ => (),
                 }
+                Event::DeviceEvent{ device_id, event } => match event {
+                    DeviceEvent::MouseMotion { delta } => {
+                        delta_mouse_pos = Some(Vec2{x: delta.0 as f32, y: delta.1 as f32});
+                    },
+                    _ => (),
+                },
                 Event::MainEventsCleared => {
                     window.request_redraw();
                 }
                 Event::RedrawRequested(_) => {
-                    x += 0.02;
+                    time_prev = time_curr;
+                    time_curr = Instant::now();
+                    let delta_time = (time_curr - time_prev).as_secs_f32();
+                    if *key_held.entry(VirtualKeyCode::D).or_insert(false) == true {camera.translation += delta_time * camera_speed * camera.right();}
+                    if *key_held.entry(VirtualKeyCode::A).or_insert(false) == true {camera.translation -= delta_time * camera_speed * camera.right();}
+                    if *key_held.entry(VirtualKeyCode::W).or_insert(false) == true {camera.translation += delta_time * camera_speed * camera.forward();}
+                    if *key_held.entry(VirtualKeyCode::S).or_insert(false) == true {camera.translation -= delta_time * camera_speed * camera.forward();}
+                    if *key_held.entry(VirtualKeyCode::Space).or_insert(false) == true {camera.translation += delta_time * camera_speed * camera.up();}
+                    if *key_held.entry(VirtualKeyCode::LShift).or_insert(false) == true {camera.translation -= delta_time * camera_speed * camera.up();}
+                    if let Some(delta_mouse) = delta_mouse_pos {
+                        if *mouse_held.entry(MouseButton::Right).or_insert(false) == true {
+                            camera_rotation.x += delta_mouse.x * mouse_sensitivity;
+                            camera_rotation.y += delta_mouse.y * mouse_sensitivity;
+                            delta_mouse_pos = None;
+                        }
+                    }
+                    camera.rotation = Quat::from_euler(glam::EulerRot::YXZ, camera_rotation.x, camera_rotation.y, camera_rotation.z);
                     renderer.update_camera(&camera);
                     renderer.begin_frame();
                     renderer.draw_model(ModelQueueEntry{
