@@ -1,6 +1,8 @@
+use crate::graphics::Renderer;
 use crate::material::Material;
 use crate::structs::Transform;
 use crate::structs::Vertex;
+use crate::texture::Texture;
 use glam::Vec4Swizzles;
 use glam::{Mat4, Vec2, Vec3, Vec4};
 use gltf::buffer::Data;
@@ -272,7 +274,7 @@ fn traverse_nodes(
 }
 
 impl Model {
-    pub(crate) fn load_gltf(path: &Path) -> Result<Model, String> {
+    pub(crate) fn load_gltf(path: &Path, renderer: &mut Renderer) -> Result<Model, String> {
         let mut model = Model::new();
 
         // Load GLTF from file
@@ -280,7 +282,7 @@ impl Model {
         if gltf_file.is_err() {
             return Err("Failed to load GLTF file {path}!".to_string());
         }
-        let (gltf_document, mesh_data, _image_data) = gltf_file.unwrap();
+        let (gltf_document, mesh_data, image_data) = gltf_file.unwrap();
 
         // Loop over each scene
         let scene = gltf_document.default_scene();
@@ -309,9 +311,9 @@ impl Model {
             let _tex_info_emm = material.emissive_texture();
 
             // Get the texture data
-            if let Some(_tex) = tex_info_alb {
+            if let Some(tex) = tex_info_alb {
                 // todo: add texture support
-                //new_material.tex_alb = renderer.upload_texture(&mut Texture::load_texture_from_gltf_image(&image_data[tex.texture().source().index()])) as i32;            
+                new_material.tex_alb = renderer.upload_texture(&mut Texture::load_texture_from_gltf_image(&image_data[tex.texture().source().index()])) as i32;            
             }
 
             model.materials.insert(

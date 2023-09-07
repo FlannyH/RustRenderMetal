@@ -6,7 +6,7 @@ use cocoa::appkit::NSView;
 use cocoa::base::YES;
 use core_graphics_types::geometry::CGSize;
 use glam::Mat4;
-use metal::{Device, MetalLayer, MTLPixelFormat, RenderPipelineState, RenderPipelineDescriptor, CommandQueue, Library, MTLResourceOptions, RenderPassDescriptor, MTLClearColor, MTLStoreAction, MTLScissorRect, MTLPrimitiveType, MTLViewport, Buffer};
+use metal::{Device, MetalLayer, MTLPixelFormat, RenderPipelineState, RenderPipelineDescriptor, CommandQueue, Library, MTLResourceOptions, RenderPassDescriptor, MTLClearColor, MTLStoreAction, MTLScissorRect, MTLPrimitiveType, MTLViewport, Buffer, TextureDescriptor, MTLRegion, MTLSize, MTLOrigin};
 use metal::foreign_types::ForeignType;
 use winit::platform::macos::WindowExtMacOS;
 use metal::MTLLoadAction;
@@ -14,10 +14,12 @@ use winit::window::Window;
 
 use crate::mesh::{Mesh, Model};
 use crate::structs::{Vertex, ConstBuffer, Transform};
+use crate::texture::Texture;
 
 // Todo: add transform
 pub struct ModelQueueEntry {
     pub model_id: usize,
+    pub transform: Transform,
 }
 
 pub struct Renderer{
@@ -29,6 +31,7 @@ pub struct Renderer{
     const_buffer_gpu: Option<Buffer>,
     const_buffer_cpu: ConstBuffer,
     loaded_models: Vec<Model>,
+    loaded_textures: Vec<metal::Texture>,
     model_queue: Vec<ModelQueueEntry>,
 }
 
@@ -49,6 +52,7 @@ impl Renderer{
             const_buffer_gpu: None,
             model_queue: Vec::new(),
             loaded_models: Vec::new(),
+            loaded_textures: Vec::new(),
         };
 
         // Create device
@@ -95,9 +99,10 @@ impl Renderer{
         pipeline_state_desc.set_vertex_function(Some(&vertex_function));
         pipeline_state_desc.set_fragment_function(Some(&fragment_function));
 
-        let attachment = pipeline_state_desc.color_attachments().object_at(0).unwrap();
-        attachment.set_pixel_format(MTLPixelFormat::RGBA8Unorm);
-        attachment.set_blending_enabled(false);
+        let color_attachment = pipeline_state_desc.color_attachments().object_at(0).unwrap();
+        color_attachment.set_pixel_format(MTLPixelFormat::RGBA8Unorm);
+        color_attachment.set_blending_enabled(false);
+
         self.pipeline_state = Some(self.device.as_ref().unwrap().new_render_pipeline_state(&pipeline_state_desc).unwrap());
     }
 
@@ -114,9 +119,10 @@ impl Renderer{
         self.model_queue.clear();
     }
 
-    pub fn end_frame(&self) {
+    pub fn end_frame(&mut self) {
         // Get the next framebuffer
-        let drawable = match self.layer.as_ref().unwrap().next_drawable() {
+        let layer = self.layer.as_ref().unwrap();
+        let drawable = match layer.next_drawable() {
             Some(drawable) => drawable,
             None => return,
         };
@@ -130,12 +136,17 @@ impl Renderer{
         color_attachment.set_clear_color(MTLClearColor::new(0.1, 0.1, 0.2, 1.0));
         color_attachment.set_store_action(MTLStoreAction::Store);
 
+        // Set up depth buffer
+        let depth_attachment = render_pass_descriptor.depth_attachment().unwrap();
+        depth_attachment.set_clear_depth(1.0);
+
         // Set up command buffer
         let command_buffer = self.command_queue.as_ref().unwrap().new_command_buffer();
         let command_encoder = command_buffer.new_render_command_encoder(render_pass_descriptor);
 
-        // Record mesh draw call
+        // Record mesh draw calls
         command_encoder.set_render_pipeline_state(self.pipeline_state.as_ref().unwrap().as_ref());
+        command_encoder.set_cull_mode(metal::MTLCullMode::None);
         command_encoder.set_scissor_rect(MTLScissorRect{x: 0, y: 0, width: size.width as u64, height: size.height as u64});
         command_encoder.set_viewport(MTLViewport{
             originX: 0.0,
@@ -147,10 +158,14 @@ impl Renderer{
         });
         command_encoder.set_vertex_buffer(1, Some(self.const_buffer_gpu.as_ref().unwrap()), 0);
         for model_id in &self.model_queue {
+            self.const_buffer_cpu.model_matrix = model_id.transform.local_matrix();
+            Self::update_const_buffer_gpu(&mut self.const_buffer_gpu.as_mut().unwrap(), &mut self.const_buffer_cpu);
+            
             let model = &self.loaded_models[model_id.model_id];
             for name in model.meshes.keys() {
                 let mesh = model.meshes.get(name).unwrap();
-                let _material = model.materials.get(name);
+                let material = model.materials.get(name);
+                command_encoder.set_fragment_texture(0, Some(&self.loaded_textures[material.unwrap().tex_alb as usize]));
                 command_encoder.set_vertex_buffer(0, Some(mesh.buffer.as_ref().unwrap()), 0);
                 command_encoder.draw_primitives(MTLPrimitiveType::Triangle, 0, mesh.verts.len() as u64);
             }
@@ -172,7 +187,7 @@ impl Renderer{
     }
 
     pub fn load_model(&mut self, path: &Path) -> Option<usize> {
-        let mut model = match Model::load_gltf(path) {
+        let mut model = match Model::load_gltf(path, self) {
             Ok(mdl) => mdl,
             Err(s) => {println!("Error loading model \"{}\": {s}", path.display()); return None;}
         };
@@ -192,10 +207,40 @@ impl Renderer{
         self.const_buffer_cpu.proj_matrix = Mat4::perspective_rh_gl(PI / 4.0, 16.0 / 9.0, 0.1, 1000.0).transpose();
 
         // Update GPU-side buffer
-        self.const_buffer_gpu = Some(self.device.as_ref().unwrap().new_buffer_with_data(
-            &mut self.const_buffer_cpu as *mut _ as *const std::ffi::c_void,
-            mem::size_of::<ConstBuffer>() as u64,
-            MTLResourceOptions::CPUCacheModeDefaultCache | MTLResourceOptions::StorageModeManaged,
-        ));
+        if self.const_buffer_gpu.is_none() {
+            self.const_buffer_gpu = Some(self.device.as_ref().unwrap().new_buffer_with_data(
+                &mut self.const_buffer_cpu as *mut _ as *const std::ffi::c_void,
+                mem::size_of::<ConstBuffer>() as u64,
+                MTLResourceOptions::CPUCacheModeDefaultCache | MTLResourceOptions::StorageModeManaged,
+            ));
+        }
+        Self::update_const_buffer_gpu(&mut self.const_buffer_gpu.as_mut().unwrap(), &mut self.const_buffer_cpu);
+    }
+
+    fn update_const_buffer_gpu(buffer_gpu: &mut Buffer, buffer_cpu: &mut ConstBuffer){
+        let buffer_gpu_data = buffer_gpu.contents();
+        unsafe {
+            std::ptr::copy(&mut *buffer_cpu, buffer_gpu_data as *mut ConstBuffer, std::mem::size_of::<ConstBuffer>());
+        }
+    }
+
+    pub fn upload_texture(&mut self, texture: &mut Texture) -> usize {
+        let texture_desc = TextureDescriptor::new();
+        texture_desc.set_width(texture.width as u64);
+        texture_desc.set_height(texture.height as u64);
+        texture_desc.set_pixel_format(MTLPixelFormat::RGBA8Unorm);
+
+        let texture_gpu = self.device.as_ref().unwrap().new_texture(&texture_desc);
+        texture_gpu.replace_region(MTLRegion{
+            origin: MTLOrigin { x: 0, y: 0, z: 0 },
+            size: MTLSize {
+                width: texture.width as u64,
+                height: texture.height as u64,
+                depth: 1,
+            },
+        }, 0, texture.data.as_ptr() as _, texture.width as u64 * 4);
+        texture.gl_id = self.loaded_textures.len() as u32;
+        self.loaded_textures.push(texture_gpu);
+        return self.loaded_textures.len() - 1;
     }
 }

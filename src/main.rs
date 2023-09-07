@@ -34,13 +34,14 @@ fn main() {
 
     let model_suzanne = renderer.load_model(Path::new("./assets/sub_nivis_gun.gltf")).unwrap();
 
-    let mut camera = Transform {
-        translation: Vec3 {x: 0.0, y: 0.0, z: -1.0},
+    let camera = Transform {
+        translation: Vec3 {x: 0.0, y: 0.0, z: 0.5},
         rotation: Quat::IDENTITY,
         scale: Vec3 {x: 1.0, y: 1.0, z: 1.0},
     };
 
     // Main loop
+    let mut x = 0.0;
     event_loop.run(move |event, _, control_flow| {
         autoreleasepool(|| {
             *control_flow = ControlFlow::Poll;
@@ -55,10 +56,16 @@ fn main() {
                     window.request_redraw();
                 }
                 Event::RedrawRequested(_) => {
-                    camera.translation.z += 0.01;
+                    x += 0.01;
                     renderer.update_camera(&camera);
                     renderer.begin_frame();
-                    renderer.draw_model(ModelQueueEntry{model_id: model_suzanne});
+                    renderer.draw_model(ModelQueueEntry{
+                        model_id: model_suzanne,
+                        transform: Transform { 
+                            translation: Vec3{x: 0.0, y: 0.0, z: 0.0}, 
+                            rotation: Quat::from_euler(glam::EulerRot::XYZ, 0.0, x, 0.0), 
+                            scale: Vec3{x: 1.0, y: 1.0, z: 1.0} }
+                    });
                     renderer.end_frame();
                     window.request_redraw();
                 }

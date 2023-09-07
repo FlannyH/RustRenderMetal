@@ -2,7 +2,7 @@ use glam::Vec3;
 
 #[derive(Debug, Clone)]
 pub struct Material {
-    // Textures - indices to Resources::textures array
+    // Textures - indices to renderer's texture array
     pub tex_alb: i32,
     pub tex_nrm: i32,
     pub tex_mtl_rgh: i32,
