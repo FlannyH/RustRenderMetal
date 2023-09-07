@@ -168,15 +168,15 @@ impl Renderer{
         command_encoder.set_viewport(MTLViewport{
             originX: 0.0,
             originY: 0.0,
-            width: size.width as f64,
-            height: size.height as f64,
+            width: size.width,
+            height: size.height,
             znear: -1.0,
             zfar: 1.0,
         });
         command_encoder.set_vertex_buffer(1, Some(self.const_buffer_gpu.as_ref().unwrap()), 0);
         for model_id in &self.model_queue {
             self.const_buffer_cpu.model_matrix = model_id.transform.local_matrix();
-            Self::update_const_buffer_gpu(&mut self.const_buffer_gpu.as_mut().unwrap(), &mut self.const_buffer_cpu);
+            Self::update_const_buffer_gpu(self.const_buffer_gpu.as_mut().unwrap(), &self.const_buffer_cpu);
             
             let model = &self.loaded_models[model_id.model_id];
             for name in model.meshes.keys() {
@@ -237,13 +237,13 @@ impl Renderer{
                 MTLResourceOptions::CPUCacheModeDefaultCache | MTLResourceOptions::StorageModeManaged,
             ));
         }
-        Self::update_const_buffer_gpu(&mut self.const_buffer_gpu.as_mut().unwrap(), &mut self.const_buffer_cpu);
+        Self::update_const_buffer_gpu( self.const_buffer_gpu.as_mut().unwrap(), &self.const_buffer_cpu);
     }
 
-    fn update_const_buffer_gpu(buffer_gpu: &mut Buffer, buffer_cpu: &mut ConstBuffer){
+    fn update_const_buffer_gpu(buffer_gpu: &mut Buffer, buffer_cpu: &ConstBuffer){
         let buffer_gpu_data = buffer_gpu.contents();
         unsafe {
-            std::ptr::copy(&mut *buffer_cpu, buffer_gpu_data as *mut ConstBuffer, std::mem::size_of::<ConstBuffer>());
+            std::ptr::copy(buffer_cpu, buffer_gpu_data as *mut ConstBuffer, 1);
         }
     }
 
