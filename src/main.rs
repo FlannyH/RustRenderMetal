@@ -32,7 +32,8 @@ fn main() {
     renderer.load_library("metal/shaders/hello_triangle.metallib");
     renderer.prepare_pipeline_state("hello_triangle_vertex", "hello_triangle_fragment");
 
-    let model_suzanne = renderer.load_model(Path::new("./assets/sub_nivis_gun.gltf")).unwrap();
+    let model_suzanne = renderer.load_model(Path::new("./assets/suzanne.gltf")).unwrap();
+    let model_gun = renderer.load_model(Path::new("./assets/sub_nivis_gun.gltf")).unwrap();
 
     let mut camera = Transform {
         translation: Vec3 {x: 0.0, y: 0.0, z: 0.5},
@@ -94,6 +95,7 @@ fn main() {
                     time_prev = time_curr;
                     time_curr = Instant::now();
                     let delta_time = (time_curr - time_prev).as_secs_f32();
+                    x += delta_time * 2.0;
                     if *key_held.entry(VirtualKeyCode::D).or_insert(false) == true {camera.translation += delta_time * camera_speed * camera.right();}
                     if *key_held.entry(VirtualKeyCode::A).or_insert(false) == true {camera.translation -= delta_time * camera_speed * camera.right();}
                     if *key_held.entry(VirtualKeyCode::W).or_insert(false) == true {camera.translation += delta_time * camera_speed * camera.forward();}
@@ -111,11 +113,18 @@ fn main() {
                     renderer.update_camera(&camera);
                     renderer.begin_frame();
                     renderer.draw_model(ModelQueueEntry{
-                        model_id: model_suzanne,
+                        model_id: model_gun,
                         transform: Transform { 
                             translation: Vec3{x: 0.0, y: 0.0, z: 0.0}, 
                             rotation: Quat::from_euler(glam::EulerRot::XYZ, 0.0, x, 0.0), 
                             scale: Vec3{x: 1.0, y: 1.0, z: 1.0} }
+                    });
+                    renderer.draw_model(ModelQueueEntry{
+                        model_id: model_suzanne,
+                        transform: Transform { 
+                            translation: Vec3{x: 0.5, y: 0.0, z: 0.0}, 
+                            rotation: Quat::from_euler(glam::EulerRot::XYZ, 0.0, x, 0.0), 
+                            scale: Vec3{x: 0.1, y: 0.1, z: 0.1} }
                     });
                     renderer.end_frame();
                     window.request_redraw();

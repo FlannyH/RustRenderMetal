@@ -28,13 +28,14 @@ pub struct Renderer{
     library: Option<Library>,
     command_queue: Option<CommandQueue>,
     layer: Option<MetalLayer>,
-    const_buffer_gpu: Option<Buffer>,
+    const_buffer_gpu: Vec<Buffer>,
     const_buffer_cpu: ConstBuffer,
     loaded_models: Vec<Model>,
     loaded_textures: Vec<metal::Texture>,
     model_queue: Vec<ModelQueueEntry>,
     depth_texture: Option<metal::Texture>,
     depth_stencil_state: Option<DepthStencilState>,
+    tex_white: usize,
 }
 
 impl Renderer{
@@ -51,12 +52,13 @@ impl Renderer{
                 view_matrix: Mat4::IDENTITY,
                 proj_matrix: Mat4::IDENTITY,
             },
-            const_buffer_gpu: None,
+            const_buffer_gpu: Vec::new(),
             model_queue: Vec::new(),
             loaded_models: Vec::new(),
             loaded_textures: Vec::new(),
             depth_texture: None,
             depth_stencil_state: None,
+            tex_white: 0,
         };
 
         // Create device
@@ -84,6 +86,16 @@ impl Renderer{
 
         // Create command queue
         renderer.command_queue = Some(renderer.device.as_ref().unwrap().new_command_queue());
+
+        // Initialize default white texture
+        let tex_white = Some(Texture {
+            gl_id: 0,
+            width: 1,
+            height: 1,
+            depth: 1,
+            data: vec![0xFFFFFFFFu32]
+        });
+        renderer.tex_white = renderer.upload_texture(&mut tex_white.unwrap());
 
         return renderer;
     }
@@ -130,6 +142,7 @@ impl Renderer{
 
     pub fn begin_frame(&mut self) {
         self.model_queue.clear();
+        self.const_buffer_gpu.clear();
     }
 
     pub fn end_frame(&mut self) {
@@ -173,16 +186,25 @@ impl Renderer{
             znear: -1.0,
             zfar: 1.0,
         });
-        command_encoder.set_vertex_buffer(1, Some(self.const_buffer_gpu.as_ref().unwrap()), 0);
         for model_id in &self.model_queue {
             self.const_buffer_cpu.model_matrix = model_id.transform.local_matrix().transpose();
-            Self::update_const_buffer_gpu(self.const_buffer_gpu.as_mut().unwrap(), &self.const_buffer_cpu);
+            self.const_buffer_gpu.push(self.device.as_ref().unwrap().new_buffer_with_data(
+                &mut self.const_buffer_cpu as *mut _ as *const std::ffi::c_void,
+                mem::size_of::<ConstBuffer>() as u64,
+                MTLResourceOptions::CPUCacheModeDefaultCache | MTLResourceOptions::StorageModeManaged,
+            ));
+            command_encoder.set_vertex_buffer(1, Some(self.const_buffer_gpu.last().unwrap()), 0);
+            Self::update_const_buffer_gpu(self.const_buffer_gpu.last_mut().unwrap(), &self.const_buffer_cpu);
             
             let model = &self.loaded_models[model_id.model_id];
             for name in model.meshes.keys() {
                 let mesh = model.meshes.get(name).unwrap();
                 let material = model.materials.get(name);
-                command_encoder.set_fragment_texture(0, Some(&self.loaded_textures[material.unwrap().tex_alb as usize]));
+                if let Some(mat) = material {
+                    command_encoder.set_fragment_texture(0, Some(&self.loaded_textures[mat.tex_alb as usize]));
+                } else {
+                    command_encoder.set_fragment_texture(0, Some(&self.loaded_textures[self.tex_white]));
+                }
                 command_encoder.set_vertex_buffer(0, Some(mesh.buffer.as_ref().unwrap()), 0);
                 command_encoder.draw_primitives(MTLPrimitiveType::Triangle, 0, mesh.verts.len() as u64);
             }
@@ -228,16 +250,6 @@ impl Renderer{
         // Update CPU-side buffer
         self.const_buffer_cpu.view_matrix = camera_transform.view_matrix().transpose();
         self.const_buffer_cpu.proj_matrix = Mat4::perspective_rh(PI / 4.0, 16.0 / 9.0, 0.1, 1000.0).transpose();
-
-        // Update GPU-side buffer
-        if self.const_buffer_gpu.is_none() {
-            self.const_buffer_gpu = Some(self.device.as_ref().unwrap().new_buffer_with_data(
-                &mut self.const_buffer_cpu as *mut _ as *const std::ffi::c_void,
-                mem::size_of::<ConstBuffer>() as u64,
-                MTLResourceOptions::CPUCacheModeDefaultCache | MTLResourceOptions::StorageModeManaged,
-            ));
-        }
-        Self::update_const_buffer_gpu( self.const_buffer_gpu.as_mut().unwrap(), &self.const_buffer_cpu);
     }
 
     fn update_const_buffer_gpu(buffer_gpu: &mut Buffer, buffer_cpu: &ConstBuffer){
